@@ -69,3 +69,8 @@ test('prefers TB when RD lost a release (uncached on RD)', () => {
   assert.strictEqual(p[0].debrid, 'TB');
   assert.ok(!p.some(x => x.release === 'h:' + h && x.debrid === 'RD'));
 });
+
+test('treats Comet ⬇️ as uncached', () => {
+  const c = parseStream({ name: '[TB⬇️] Comet 2160p', description: 'X.2160p.mkv' }, TB);
+  assert.strictEqual(c.cached, false);
+});

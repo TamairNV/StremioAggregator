@@ -45,7 +45,7 @@ function parseDebrid(s, fallback) {
 }
 
 function parseCached(text) {
-  if (/⏳|\bdownload\b|uncached/i.test(text)) return false;
+  if (/⏳|⬇|\bdownload\b|uncached/iu.test(text)) return false;
   if (/\+\]|⚡|\bcached\b|\b(RD|TB)\+/iu.test(text)) return true;
   return null;
 }
