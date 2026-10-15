@@ -36,4 +36,21 @@ Stremio needs HTTPS for addons outside localhost. Easiest options:
 
 Keep the URL private: anyone with it streams on your debrid accounts.
 
+### Docker (how the home server runs it)
+```bash
+docker build -t stremio-aggregator .
+docker run -d --name stremio-aggregator --restart unless-stopped -p 7000:7000 \
+  -e UPSTREAM_TIMEOUT_MS=4000 \
+  -v "$PWD/providers.json:/app/providers.json:ro" \
+  stremio-aggregator
+```
+`providers.json` stays outside the image (it holds your keys). After editing it: `docker restart stremio-aggregator`.
+To update the code: pull, rebuild, then `docker rm -f stremio-aggregator` and run the command above again.
+
+HTTPS, reachable only from your own Tailscale devices:
+```bash
+sudo tailscale serve --bg --https=443 http://localhost:7000
+```
+Then add `https://<machine>.<tailnet>.ts.net/manifest.json` in Stremio.
+
 `npm test` runs the picking tests.
