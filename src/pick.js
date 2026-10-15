@@ -63,9 +63,10 @@ function pickTop(parsed, { want4k = 3, want1080 = 2, onlyCached = false } = {}) 
     for (const strict of [true, false]) {
       for (const c of list) {
         if (got >= n) return got;
-        if (taken.has(c) || (strict && c.release && usedRelease.has(c.release))) continue;
+        const keys = [c.release, c.lookalike].filter(Boolean);
+        if (taken.has(c) || (strict && keys.some(k => usedRelease.has(k)))) continue;
         taken.add(c);
-        if (c.release) usedRelease.add(c.release);
+        keys.forEach(k => usedRelease.add(k));
         picks.push({ ...c, slot });
         got++;
       }

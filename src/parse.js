@@ -58,14 +58,26 @@ function releaseKey(s, text) {
   return null;
 }
 
+// Same file uploaded as different torrents: match on the release name + rough size instead of hash.
+function lookalikeKey(s, text, size) {
+  const lines = [s.behaviorHints && s.behaviorHints.filename, ...text.split('\n')].filter(Boolean);
+  const line = lines.find(l => /\.(mkv|mp4|avi|ts)\s*$/i.test(l)) ||
+    lines.filter(l => /\b(2160p|1080p)\b/i.test(l)).sort((a, b) => b.length - a.length)[0];
+  if (!line || line.length < 15) return null;
+  const name = line.toLowerCase().replace(/\.(mkv|mp4|avi|ts)\s*$/, '').replace(/[^a-z0-9]+/g, '');
+  return name + '|' + (size ? Math.round(size / 1024 ** 3) : '?');
+}
+
 function parseStream(s, provider) {
   const text = textOf(s);
+  const size = parseSizeBytes(s, text);
   return {
     stream: s,
     provider: provider.name,
     resolution: parseResolution(text),
     seeders: parseSeeders(text),
-    size: parseSizeBytes(s, text),
+    size,
+    lookalike: lookalikeKey(s, text, size),
     debrid: parseDebrid(s, provider.debrid),
     cached: parseCached(text),
     release: releaseKey(s, text),

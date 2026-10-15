@@ -8,7 +8,7 @@ const RD2 = { name: 'Comet', debrid: 'RD' };
 const TB = { name: 'MediaFusion', debrid: 'TB' };
 
 const mk = (prov, res, seeds, hash, extra = '') =>
-  parseStream({ name: `[${prov.debrid}+] ${prov.name}\n${res}`, title: `Movie.${res}.mkv\n👤 ${seeds} 💾 10 GB ${extra}`, infoHash: hash, url: 'x' }, prov);
+  parseStream({ name: `[${prov.debrid}+] ${prov.name}\n${res}`, title: `Movie.${hash.slice(0, 4)}.${res}.mkv\n👤 ${seeds} 💾 10 GB ${extra}`, infoHash: hash, url: 'x' }, prov);
 
 test('picks 3x4K + 2x1080p by seeders', () => {
   const s = [
@@ -73,4 +73,10 @@ test('prefers TB when RD lost a release (uncached on RD)', () => {
 test('treats Comet ⬇️ as uncached', () => {
   const c = parseStream({ name: '[TB⬇️] Comet 2160p', description: 'X.2160p.mkv' }, TB);
   assert.strictEqual(c.cached, false);
+});
+
+test('skips the same file uploaded as a different torrent', () => {
+  const t = (seeds, hash) => parseStream({ name: '[TB+] Comet\n2160p', description: `Dune.Part.Two.2024.2160p.WEB-DL.DV.mkv\n👤 ${seeds} 💾 29 GB`, infoHash: hash }, TB);
+  const p = pickTop([t(503, 'a'.repeat(40)), t(452, 'b'.repeat(40)), mk(RD, '2160p', 100, 'c'.repeat(40)), mk(RD, '2160p', 90, 'd'.repeat(40))]);
+  assert.deepStrictEqual(p.slice(0, 3).map(x => x.seeders), [503, 100, 90]);
 });
