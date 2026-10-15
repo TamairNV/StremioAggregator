@@ -26,7 +26,7 @@ Uninstall (or keep below it) the 4 original addons if you only want to see the t
 | `PORT` | 7000 | |
 | `PROVIDERS` | – | JSON array instead of `providers.json` |
 | `ONLY_CACHED` | false | drop streams marked uncached |
-| `UPSTREAM_TIMEOUT_MS` | 10000 | per-addon timeout |
+| `UPSTREAM_TIMEOUT_MS` | 6000 | per-addon timeout |
 | `CACHE_MINUTES` | 30 | result cache |
 
 ## Deploy

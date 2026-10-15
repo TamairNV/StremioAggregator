@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { addonBuilder, serveHTTP } = require('stremio-addon-sdk');
-const { fetchAll } = require('./upstream');
+const { fetchOne } = require('./upstream');
 const { parseStream } = require('./parse');
 const { pickTop } = require('./pick');
 
@@ -71,24 +71,45 @@ function decorate(p) {
   };
 }
 
-builder.defineStreamHandler(async ({ type, id }) => {
+function toParsed(results) {
+  return results.flatMap(r =>
+    r.streams
+      .map(s => parseStream(s, r.provider))
+      .filter(p => !r.provider.resolutions || r.provider.resolutions.includes(p.resolution)));
+}
+
+const inflight = new Map();
+
+// Share one in-flight lookup per title, so a prefetch and a real click don't both hit the addons.
+function lookup(type, id) {
+  const key = `${type}:${id}`;
+  if (!inflight.has(key)) inflight.set(key, doLookup(type, id).finally(() => inflight.delete(key)));
+  return inflight.get(key);
+}
+
+async function doLookup(type, id) {
   const key = `${type}:${id}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
 
-  const results = await fetchAll(providers, type, id);
-  const parsed = results.flatMap(r =>
-    r.streams
-      .map(s => parseStream(s, r.provider))
-      .filter(p => !r.provider.resolutions || r.provider.resolutions.includes(p.resolution))
-      .map(p => ({ ...p, backup: !!r.provider.backup })));
-  const picks = pickTop(parsed.filter(p => !p.backup), { onlyCached });
-  // Backup providers (e.g. plain P2P Torrentio) only fill slots the debrid addons couldn't.
+  // Start everything at once, but only wait on the backup if the debrid addons come up short.
+  const main = Promise.all(providers.filter(p => !p.backup).map(p => fetchOne(p, type, id)));
+  const backup = Promise.all(providers.filter(p => p.backup).map(p => fetchOne(p, type, id)));
+  const picks = pickTop(toParsed(await main), { onlyCached });
   const missing = 5 - picks.length;
-  if (missing > 0) picks.push(...pickTop(parsed.filter(p => p.backup), { want4k: 0, want1080: missing }));
+  if (missing > 0) picks.push(...pickTop(toParsed(await backup), { want4k: 0, want1080: missing }));
+
   const value = { streams: picks.map(p => decorate(p)), cacheMaxAge: 1800 };
   // Don't cache backup-only answers, so a debrid hiccup doesn't stick around.
   if (picks.length && missing <= 0) cache.set(key, { at: Date.now(), value });
+  return value;
+}
+
+builder.defineStreamHandler(async ({ type, id }) => {
+  const value = await lookup(type, id);
+  // Watching a series? Warm up the next episode so it opens instantly.
+  const m = type === 'series' && id.match(/^(.+):(\d+):(\d+)$/);
+  if (m) lookup(type, `${m[1]}:${m[2]}:${Number(m[3]) + 1}`).catch(() => {});
   return value;
 });
 
