@@ -26,11 +26,16 @@ function merge(parsed) {
 
 // Popularity: seeders (log scaled so 5000 vs 3000 doesn't dominate), plus a bump for
 // every extra provider that listed the same release, plus a bump for being cached.
-function score(c) {
+// English audio first: dual-audio releases often default to the other language.
+const LANGUAGE = { en: 0, multi: -20, 'unknown-multi': -35, foreign: -80 };
+
+function score(c, prefer) {
   const seeds = c.seeders ?? 0;
+  // Same release as the previous episode's picks, so a season stays on one release.
+  const sticky = prefer && c.signature && prefer.has(c.signature) ? 30 : 0;
   // Uncached usually means the debrid dropped it (e.g. RD takedowns), so it'd just start a download.
   const cache = c.cached === true ? 10 : c.cached === false ? -40 : 0;
-  return Math.log2(1 + seeds) * 10 + (c.providers.size - 1) * 15 + cache;
+  return Math.log2(1 + seeds) * 10 + (c.providers.size - 1) * 15 + cache + (LANGUAGE[c.language] ?? 0) + sticky;
 }
 
 // If a release is cached on one service but not the other, drop the uncached copy.
@@ -44,8 +49,8 @@ function byScore(a, b) {
   return b.score - a.score || (b.size || 0) - (a.size || 0);
 }
 
-function pickTop(parsed, { want4k = 3, want1080 = 2, onlyCached = false } = {}) {
-  let cands = dropUncachedTwins(merge(parsed)).map(c => ({ ...c, score: score(c) }));
+function pickTop(parsed, { want4k = 3, want1080 = 2, onlyCached = false, prefer = null } = {}) {
+  let cands = dropUncachedTwins(merge(parsed)).map(c => ({ ...c, score: score(c, prefer) }));
   if (onlyCached) cands = cands.filter(c => c.cached !== false);
   cands.sort(byScore);
 

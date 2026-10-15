@@ -62,10 +62,14 @@ function decorate(p) {
   const s = p.stream;
   const text = [s.name, s.title, s.description, s.behaviorHints && s.behaviorHints.filename].filter(Boolean).join('\n');
   const label = p.slot === '4k' ? '4K' : p.slot === '1080p' ? '1080p' : p.resolution;
-  const stats = [...qualityTags(text), fmtSize(p.size), p.seeders != null ? `👤 ${p.seeders}` : null].filter(Boolean).join(' · ');
+  const lang = { multi: 'Multi', 'unknown-multi': 'Multi?', foreign: 'No ENG' }[p.language];
+  const stats = [...qualityTags(text), lang, fmtSize(p.size), p.seeders != null ? `👤 ${p.seeders}` : null].filter(Boolean).join(' · ');
   const { title, ...rest } = s;
+  // Stremio's autoplay picks the next episode's stream with the same bingeGroup.
+  const behaviorHints = { ...s.behaviorHints, bingeGroup: `top5|${p.debrid}|${p.signature || p.release || p.slot}` };
   return {
     ...rest,
+    behaviorHints,
     name: `${label}\n${p.debrid}${p.cached ? ' ⚡' : ''}`,
     description: `${shortTitle(s)}\n${stats}`,
   };
@@ -79,6 +83,13 @@ function toParsed(results) {
 }
 
 const inflight = new Map();
+// series:season -> release signatures picked for the latest episode looked up.
+const seasonPicks = new Map();
+
+function seasonKey(type, id) {
+  const m = type === 'series' && id.match(/^(.+):(\d+):\d+$/);
+  return m ? `${m[1]}:${m[2]}` : null;
+}
 
 // Share one in-flight lookup per title, so a prefetch and a real click don't both hit the addons.
 function lookup(type, id) {
@@ -95,7 +106,10 @@ async function doLookup(type, id) {
   // Start everything at once, but only wait on the backup if the debrid addons come up short.
   const main = Promise.all(providers.filter(p => !p.backup).map(p => fetchOne(p, type, id)));
   const backup = Promise.all(providers.filter(p => p.backup).map(p => fetchOne(p, type, id)));
-  const picks = pickTop(toParsed(await main), { onlyCached });
+  const season = seasonKey(type, id);
+  const prefer = season && seasonPicks.get(season);
+  const picks = pickTop(toParsed(await main), { onlyCached, prefer: prefer && Date.now() - prefer.at < 6 * 3600e3 ? prefer.sigs : null });
+  if (season && picks.length) seasonPicks.set(season, { at: Date.now(), sigs: new Set(picks.map(p => p.signature).filter(Boolean)) });
   const missing = 5 - picks.length;
   if (missing > 0) picks.push(...pickTop(toParsed(await backup), { want4k: 0, want1080: missing }));
 

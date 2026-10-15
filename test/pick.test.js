@@ -92,3 +92,30 @@ test('coverage swap avoids repeating a release on the other debrid', () => {
   assert.ok(p.some(x => x.debrid === 'RD'));
   assert.strictEqual(p.filter(x => x.lookalike === p[3].lookalike).length, 1);
 });
+
+test('reads audio language from flags and release names', () => {
+  const { parseLanguage } = require('../src/parse');
+  assert.strictEqual(parseLanguage('Dune.Part.Two.2024.2160p.WEB-DL.mkv'), 'en');
+  assert.strictEqual(parseLanguage('GoT.S01E01.MULTi.VFI.2160p.mkv\n🌎/🇫🇷'), 'unknown-multi');
+  assert.strictEqual(parseLanguage('Show [ger eng].mkv\n🇬🇧 / 🇩🇪'), 'multi');
+  assert.strictEqual(parseLanguage('Show.2160p.mkv\n🇮🇩'), 'foreign');
+  assert.strictEqual(parseLanguage('Игра престолов.S01E01.WEB-DL.2160p.mkv'), 'foreign');
+});
+
+test('ranks English audio above a more popular foreign release', () => {
+  const en = parseStream({ name: '[TB+] X\n2160p', title: 'Movie.2160p.WEB-DL-FLUX.mkv\n👤 200 💾 20 GB', infoHash: 'a'.repeat(40) }, TB);
+  const fr = parseStream({ name: '[TB+] X\n2160p', title: 'Movie.2160p.MULTi.VFF.mkv\n👤 800 💾 20 GB\n🇫🇷', infoHash: 'b'.repeat(40) }, TB);
+  assert.strictEqual(pickTop([fr, en])[0].release, 'h:' + 'a'.repeat(40));
+});
+
+test('sticks to the previous episode release group', () => {
+  const ep = (group, seeds, hash) => parseStream({ name: '[TB+] X\n1080p', title: `Show.S01E02.1080p.WEB-DL.DDP5.1-${group}.mkv\n👤 ${seeds} 💾 3 GB`, infoHash: hash }, TB);
+  const a = ep('NTb', 100, 'a'.repeat(40)), b = ep('FLUX', 140, 'b'.repeat(40));
+  assert.strictEqual(pickTop([a, b])[0].signature, b.signature);
+  assert.strictEqual(pickTop([a, b], { prefer: new Set([a.signature]) })[0].signature, a.signature);
+});
+
+test('reads size from 💾, not from a size in the release name', () => {
+  const c = parseStream({ name: '[TB+] X\n1080p', title: 'Dune.Part.Two.2024.1080p.WEBRip.1600MB.DD5.1.x264-GalaxyRG\n👤 299 💾 1.6 GB' }, TB);
+  assert.strictEqual(Math.round(c.size / 1024 ** 2), 1638);
+});
