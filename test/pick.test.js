@@ -77,6 +77,6 @@ test('treats Comet ⬇️ as uncached', () => {
 
 test('skips the same file uploaded as a different torrent', () => {
   const t = (seeds, hash) => parseStream({ name: '[TB+] Comet\n2160p', description: `Dune.Part.Two.2024.2160p.WEB-DL.DV.mkv\n👤 ${seeds} 💾 29 GB`, infoHash: hash }, TB);
-  const p = pickTop([t(503, 'a'.repeat(40)), t(452, 'b'.repeat(40)), mk(RD, '2160p', 100, 'c'.repeat(40)), mk(RD, '2160p', 90, 'd'.repeat(40))]);
-  assert.deepStrictEqual(p.slice(0, 3).map(x => x.seeders), [503, 100, 90]);
+  const p = pickTop([t(503, 'a'.repeat(40)), t(452, 'b'.repeat(40)), mk(RD, '2160p', 100, 'c'.repeat(40)), mk(RD, '2160p', 90, 'd'.repeat(40)), mk(RD, '1080p', 5, 'e'.repeat(40)), mk(RD, '1080p', 4, 'f'.repeat(40))]);
+  assert.deepStrictEqual(p.filter(x => x.slot === '4k').map(x => x.seeders), [503, 100, 90]);
 });
