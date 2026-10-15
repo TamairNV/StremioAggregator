@@ -60,3 +60,12 @@ test('parses common title formats', () => {
   assert.strictEqual(c.debrid, 'TB');
   assert.strictEqual(c.cached, true);
 });
+
+test('prefers TB when RD lost a release (uncached on RD)', () => {
+  const h = 'a'.repeat(40);
+  const rdGone = parseStream({ name: '[RD download] Torrentio\n2160p', title: 'Show.2160p.mkv\n👤 900 💾 10 GB', infoHash: h }, RD);
+  const tbOk = parseStream({ name: '[TB+] Torrentio\n2160p', title: 'Show.2160p.mkv\n👤 900 💾 10 GB', infoHash: h }, TB);
+  const p = pickTop([rdGone, tbOk, mk(RD, '2160p', 20, 'b'.repeat(40))]);
+  assert.strictEqual(p[0].debrid, 'TB');
+  assert.ok(!p.some(x => x.release === 'h:' + h && x.debrid === 'RD'));
+});

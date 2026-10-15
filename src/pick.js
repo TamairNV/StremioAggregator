@@ -28,7 +28,16 @@ function merge(parsed) {
 // every extra provider that listed the same release, plus a bump for being cached.
 function score(c) {
   const seeds = c.seeders ?? 0;
-  return Math.log2(1 + seeds) * 10 + (c.providers.size - 1) * 15 + (c.cached === true ? 10 : 0);
+  // Uncached usually means the debrid dropped it (e.g. RD takedowns), so it'd just start a download.
+  const cache = c.cached === true ? 10 : c.cached === false ? -40 : 0;
+  return Math.log2(1 + seeds) * 10 + (c.providers.size - 1) * 15 + cache;
+}
+
+// If a release is cached on one service but not the other, drop the uncached copy.
+function dropUncachedTwins(cands) {
+  const cachedOn = new Map();
+  for (const c of cands) if (c.release && c.cached === true) cachedOn.set(c.release, true);
+  return cands.filter(c => !(c.release && c.cached === false && cachedOn.get(c.release)));
 }
 
 function byScore(a, b) {
@@ -36,7 +45,7 @@ function byScore(a, b) {
 }
 
 function pickTop(parsed, { want4k = 3, want1080 = 2, onlyCached = false } = {}) {
-  let cands = merge(parsed).map(c => ({ ...c, score: score(c) }));
+  let cands = dropUncachedTwins(merge(parsed)).map(c => ({ ...c, score: score(c) }));
   if (onlyCached) cands = cands.filter(c => c.cached !== false);
   cands.sort(byScore);
 
