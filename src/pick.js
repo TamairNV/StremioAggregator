@@ -92,20 +92,26 @@ function slotOrder(p) {
 // If every pick is on one debrid, swap in the best candidate from the missing one,
 // choosing the swap that loses the least score and keeps the resolution slot intact.
 function ensureCoverage(picks, buckets, taken) {
+  const keysOf = c => [c.release, c.lookalike].filter(Boolean);
   for (const svc of SERVICES) {
     if (picks.some(p => p.debrid === svc)) continue;
-    let best = null;
-    for (let i = 0; i < picks.length; i++) {
-      const out = picks[i];
-      const pool = out.slot === 'other' ? buckets.rest : buckets[out.slot];
-      const inn = pool.find(c => c.debrid === svc && !taken.has(c));
-      if (!inn) continue;
-      const loss = out.score - inn.score;
-      if (!best || loss < best.loss) best = { i, inn, loss };
-    }
-    if (best) {
-      taken.add(best.inn);
-      picks[best.i] = { ...best.inn, slot: picks[best.i].slot };
+    // First try swaps that don't repeat a release already on the list; only then allow repeats.
+    for (const allowRepeat of [false, true]) {
+      let best = null;
+      for (let i = 0; i < picks.length; i++) {
+        const out = picks[i];
+        const others = new Set(picks.filter((_, j) => j !== i).flatMap(keysOf));
+        const pool = out.slot === 'other' ? buckets.rest : buckets[out.slot];
+        const inn = pool.find(c => c.debrid === svc && !taken.has(c) && (allowRepeat || !keysOf(c).some(k => others.has(k))));
+        if (!inn) continue;
+        const loss = out.score - inn.score;
+        if (!best || loss < best.loss) best = { i, inn, loss };
+      }
+      if (best) {
+        taken.add(best.inn);
+        picks[best.i] = { ...best.inn, slot: picks[best.i].slot };
+        break;
+      }
     }
   }
 }

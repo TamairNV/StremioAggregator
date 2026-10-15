@@ -80,3 +80,15 @@ test('skips the same file uploaded as a different torrent', () => {
   const p = pickTop([t(503, 'a'.repeat(40)), t(452, 'b'.repeat(40)), mk(RD, '2160p', 100, 'c'.repeat(40)), mk(RD, '2160p', 90, 'd'.repeat(40)), mk(RD, '1080p', 5, 'e'.repeat(40)), mk(RD, '1080p', 4, 'f'.repeat(40))]);
   assert.deepStrictEqual(p.filter(x => x.slot === '4k').map(x => x.seeders), [503, 100, 90]);
 });
+
+test('coverage swap avoids repeating a release on the other debrid', () => {
+  const y = (prov, seeds, hash) => parseStream({ name: `[${prov.debrid}+] X\n1080p`, title: `Dune.Part.Two.2024.1080p.WEBRip.x264-YTS.mkv\n👤 ${seeds} 💾 2.8 GB`, infoHash: hash }, prov);
+  const s = [
+    mk(TB, '2160p', 500, 'a'.repeat(40)), mk(TB, '2160p', 400, 'b'.repeat(40)), mk(TB, '2160p', 300, 'c'.repeat(40)),
+    y(TB, 1090, 'd'.repeat(40)), mk(TB, '1080p', 800, 'e'.repeat(40)),
+    y(RD, 1046, 'd'.repeat(40)), mk(RD, '1080p', 600, 'f'.repeat(40)),
+  ];
+  const p = pickTop(s);
+  assert.ok(p.some(x => x.debrid === 'RD'));
+  assert.strictEqual(p.filter(x => x.lookalike === p[3].lookalike).length, 1);
+});
