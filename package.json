@@ -1,0 +1,14 @@
+{
+  "name": "stremio-aggregator",
+  "version": "1.0.0",
+  "description": "Aggregates 4 stream addons and returns the top 3 4K + top 2 1080p, spanning RD and TorBox",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "stremio-addon-sdk": "^1.6.10"
+  }
+}

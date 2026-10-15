@@ -1,0 +1,6 @@
+[
+  { "name": "Torrentio-RD", "debrid": "RD", "url": "https://torrentio.strem.fun/realdebrid=YOUR_RD_KEY/manifest.json" },
+  { "name": "Torrentio-TB", "debrid": "TB", "url": "https://torrentio.strem.fun/torbox=YOUR_TB_KEY/manifest.json" },
+  { "name": "Comet-TB",     "debrid": "TB", "url": "https://comet.elfhosted.com/YOUR_COMET_CONFIG/manifest.json" },
+  { "name": "Torrentio",    "debrid": "P2P", "backup": true, "resolutions": ["1080p"], "url": "https://torrentio.strem.fun/manifest.json" }
+]
