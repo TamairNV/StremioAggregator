@@ -28,18 +28,46 @@ const builder = new addonBuilder({
 });
 
 function fmtSize(b) {
-  return b ? (b / 1024 ** 3).toFixed(1) + ' GB' : '?';
+  if (!b) return null;
+  const gb = b / 1024 ** 3;
+  return gb >= 10 ? Math.round(gb) + ' GB' : gb.toFixed(1) + ' GB';
 }
 
-function decorate(p, rank) {
+// Quality tags worth seeing at a glance, pulled from the upstream text.
+const TAGS = [
+  [/\b(DV|DoVi|Dolby[ .]?Vision)\b/i, 'DV'],
+  [/\bHDR10\+/i, 'HDR10+'],
+  [/\bHDR(10)?\b/i, 'HDR'],
+  [/\bREMUX\b/i, 'Remux'],
+  [/\bAtmos\b/i, 'Atmos'],
+];
+
+function qualityTags(text) {
+  const out = [];
+  for (const [re, tag] of TAGS) {
+    if (re.test(text) && !(tag === 'HDR' && out.includes('HDR10+'))) out.push(tag);
+  }
+  return out;
+}
+
+// A short, readable release name: the filename if we have one, minus extension and dots.
+function shortTitle(s) {
+  const text = [s.behaviorHints && s.behaviorHints.filename, s.title, s.description].filter(Boolean).join('\n');
+  const line = text.split('\n').map(l => l.trim()).find(l => /\.(mkv|mp4|avi|ts)$/i.test(l) || /\b(2160p|1080p)\b/i.test(l)) || text.split('\n')[0] || '';
+  const clean = line.replace(/^[^\w]+/u, '').replace(/\.(mkv|mp4|avi|ts)$/i, '').replace(/[._]+/g, ' ').trim();
+  return clean.length > 60 ? clean.slice(0, 57) + '…' : clean;
+}
+
+function decorate(p) {
   const s = p.stream;
+  const text = [s.name, s.title, s.description, s.behaviorHints && s.behaviorHints.filename].filter(Boolean).join('\n');
   const label = p.slot === '4k' ? '4K' : p.slot === '1080p' ? '1080p' : p.resolution;
-  const stats = `⭐ #${rank} · 👤 ${p.seeders ?? '?'} · 💾 ${fmtSize(p.size)} · ${p.debrid}${p.cached ? '⚡' : ''} · via ${[...p.providers].join('+')}`;
+  const stats = [...qualityTags(text), fmtSize(p.size), p.seeders != null ? `👤 ${p.seeders}` : null].filter(Boolean).join(' · ');
+  const { title, ...rest } = s;
   return {
-    ...s,
-    name: `Top5 ${label}\n${p.debrid}${p.cached ? '+' : ''}`,
-    description: `${stats}\n${s.description || s.title || ''}`,
-    title: undefined,
+    ...rest,
+    name: `${label}\n${p.debrid}${p.cached ? ' ⚡' : ''}`,
+    description: `${shortTitle(s)}\n${stats}`,
   };
 }
 
@@ -58,7 +86,7 @@ builder.defineStreamHandler(async ({ type, id }) => {
   // Backup providers (e.g. plain P2P Torrentio) only fill slots the debrid addons couldn't.
   const missing = 5 - picks.length;
   if (missing > 0) picks.push(...pickTop(parsed.filter(p => p.backup), { want4k: 0, want1080: missing }));
-  const value = { streams: picks.map((p, i) => decorate(p, i + 1)), cacheMaxAge: 1800 };
+  const value = { streams: picks.map(p => decorate(p)), cacheMaxAge: 1800 };
   // Don't cache backup-only answers, so a debrid hiccup doesn't stick around.
   if (picks.length && missing <= 0) cache.set(key, { at: Date.now(), value });
   return value;
