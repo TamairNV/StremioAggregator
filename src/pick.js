@@ -124,6 +124,12 @@ function ensureCoverage(picks, buckets, taken) {
 const LITE_MIN_SEEDERS = Number(process.env.LITE_MIN_SEEDERS || 5);
 const LITE_MIN_BYTES = 300 * 1024 ** 2; // anything smaller is usually a sample or junk
 
+// Apple TV and most iPads can't hardware-decode AV1, so it stutters on exactly the devices Lite is for.
+function isAV1(c) {
+  const s = c.stream || {};
+  return /\bAV1\b/i.test([s.name, s.title, s.description, s.behaviorHints && s.behaviorHints.filename].filter(Boolean).join(' '));
+}
+
 // Bad-wifi pick: the smallest cached 1080p that still has a few seeders, not already listed.
 function pickLite(parsed, exclude = []) {
   const used = new Set(exclude.flatMap(p => [p.release, p.lookalike]).filter(Boolean));
@@ -131,6 +137,7 @@ function pickLite(parsed, exclude = []) {
     c.resolution === '1080p' &&
     c.cached !== false &&
     c.language !== 'foreign' &&
+    !isAV1(c) &&
     c.size >= LITE_MIN_BYTES &&
     (c.seeders != null ? c.seeders >= LITE_MIN_SEEDERS : c.cached === true) &&
     ![c.release, c.lookalike].some(k => k && used.has(k)));

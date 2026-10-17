@@ -129,3 +129,10 @@ test('lite pick: smallest cached 1080p with a few seeders, not already listed', 
   assert.strictEqual(lite.seeders, 40); // 0.9GB has too few seeders, 0.1GB is junk, 1.1GB is already listed
   assert.strictEqual(lite.slot, 'lite');
 });
+
+test('lite pick skips AV1', () => {
+  const { pickLite } = require('../src/pick');
+  const one = (gb, hash, codec) => parseStream({ name: `[RD+] X\n1080p`, title: `Film.${hash.slice(0, 4)}.1080p.${codec}.mkv\n👤 20 💾 ${gb} GB`, infoHash: hash }, RD);
+  const lite = pickLite([one(0.6, 'a'.repeat(40), 'AV1'), one(1.2, 'b'.repeat(40), 'x264')]);
+  assert.strictEqual(lite.size, Math.round(1.2 * 1024 ** 3));
+});
