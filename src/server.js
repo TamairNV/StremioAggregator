@@ -110,12 +110,15 @@ async function doLookup(type, id) {
   const season = seasonKey(type, id);
   const prefer = season && seasonPicks.get(season);
   const mainParsed = toParsed(await main);
-  const picks = pickTop(mainParsed, { onlyCached, prefer: prefer && Date.now() - prefer.at < 6 * 3600e3 ? prefer.sigs : null });
+  // Lite (smallest decent 1080p) is chosen first so it really is the smallest; the top 5 come from the rest.
+  const lite = pickLite(mainParsed);
+  const liteKeys = lite ? [lite.release, lite.lookalike].filter(Boolean) : [];
+  const rest = mainParsed.filter(p => ![p.release, p.lookalike].some(k => k && liteKeys.includes(k)));
+  const picks = pickTop(rest, { onlyCached, prefer: prefer && Date.now() - prefer.at < 6 * 3600e3 ? prefer.sigs : null });
   if (season && picks.length) seasonPicks.set(season, { at: Date.now(), sigs: new Set(picks.map(p => p.signature).filter(Boolean)) });
   const missing = 5 - picks.length;
   if (missing > 0) picks.push(...pickTop(toParsed(await backup), { want4k: 0, want1080: missing }));
   // 6th slot: smallest decent 1080p for bad connections (trains etc).
-  const lite = pickLite(mainParsed, picks);
   if (lite) picks.push(lite);
 
   const value = { streams: picks.map(p => decorate(p)), cacheMaxAge: 1800 };
