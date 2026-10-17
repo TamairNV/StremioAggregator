@@ -1,7 +1,7 @@
 # StremioAggregator
 
 Asks your 4 stream addons for streams, merges duplicates, scores them by popularity and returns
-**3 best 4K + 2 best 1080p**, always with at least one Real-Debrid and one TorBox pick.
+**3 best 4K + 2 best 1080p**, always with at least one Real-Debrid and one TorBox pick, plus a 6th **1080p Lite** pick (smallest cached 1080p with a few seeders) for bad connections.
 
 ## Setup
 1. Copy `providers.example.json` to `providers.json` and paste in each addon's **manifest URL**
@@ -26,6 +26,7 @@ Uninstall (or keep below it) the 4 original addons if you only want to see the t
 | `PORT` | 7000 | |
 | `PROVIDERS` | – | JSON array instead of `providers.json` |
 | `ONLY_CACHED` | false | drop streams marked uncached |
+| `LITE_MIN_SEEDERS` | 5 | minimum seeders for the Lite pick |
 | `UPSTREAM_TIMEOUT_MS` | 6000 | per-addon timeout |
 | `CACHE_MINUTES` | 30 | result cache |
 

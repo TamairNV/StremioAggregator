@@ -3,7 +3,7 @@ const path = require('path');
 const { addonBuilder, serveHTTP } = require('stremio-addon-sdk');
 const { fetchOne } = require('./upstream');
 const { parseStream } = require('./parse');
-const { pickTop } = require('./pick');
+const { pickTop, pickLite } = require('./pick');
 
 function loadProviders() {
   if (process.env.PROVIDERS) return JSON.parse(process.env.PROVIDERS);
@@ -61,12 +61,13 @@ function shortTitle(s) {
 function decorate(p) {
   const s = p.stream;
   const text = [s.name, s.title, s.description, s.behaviorHints && s.behaviorHints.filename].filter(Boolean).join('\n');
-  const label = p.slot === '4k' ? '4K' : p.slot === '1080p' ? '1080p' : p.resolution;
+  const label = p.slot === '4k' ? '4K' : p.slot === '1080p' ? '1080p' : p.slot === 'lite' ? '1080p Lite' : p.resolution;
   const lang = { multi: 'Multi', 'unknown-multi': 'Multi?', foreign: 'No ENG' }[p.language];
   const stats = [...qualityTags(text), lang, fmtSize(p.size), p.seeders != null ? `👤 ${p.seeders}` : null].filter(Boolean).join(' · ');
   const { title, ...rest } = s;
   // Stremio's autoplay picks the next episode's stream with the same bingeGroup.
-  const behaviorHints = { ...s.behaviorHints, bingeGroup: `top5|${p.debrid}|${p.signature || p.release || p.slot}` };
+  // (Lite shares one group, so autoplay keeps you on the small file all season.)
+  const behaviorHints = { ...s.behaviorHints, bingeGroup: p.slot === 'lite' ? 'top5|lite' : `top5|${p.debrid}|${p.signature || p.release || p.slot}` };
   return {
     ...rest,
     behaviorHints,
@@ -108,10 +109,14 @@ async function doLookup(type, id) {
   const backup = Promise.all(providers.filter(p => p.backup).map(p => fetchOne(p, type, id)));
   const season = seasonKey(type, id);
   const prefer = season && seasonPicks.get(season);
-  const picks = pickTop(toParsed(await main), { onlyCached, prefer: prefer && Date.now() - prefer.at < 6 * 3600e3 ? prefer.sigs : null });
+  const mainParsed = toParsed(await main);
+  const picks = pickTop(mainParsed, { onlyCached, prefer: prefer && Date.now() - prefer.at < 6 * 3600e3 ? prefer.sigs : null });
   if (season && picks.length) seasonPicks.set(season, { at: Date.now(), sigs: new Set(picks.map(p => p.signature).filter(Boolean)) });
   const missing = 5 - picks.length;
   if (missing > 0) picks.push(...pickTop(toParsed(await backup), { want4k: 0, want1080: missing }));
+  // 6th slot: smallest decent 1080p for bad connections (trains etc).
+  const lite = pickLite(mainParsed, picks);
+  if (lite) picks.push(lite);
 
   const value = { streams: picks.map(p => decorate(p)), cacheMaxAge: 1800 };
   // Don't cache backup-only answers, so a debrid hiccup doesn't stick around.

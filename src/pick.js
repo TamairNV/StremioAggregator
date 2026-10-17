@@ -121,4 +121,23 @@ function ensureCoverage(picks, buckets, taken) {
   }
 }
 
-module.exports = { pickTop, merge, score };
+const LITE_MIN_SEEDERS = Number(process.env.LITE_MIN_SEEDERS || 5);
+const LITE_MIN_BYTES = 300 * 1024 ** 2; // anything smaller is usually a sample or junk
+
+// Bad-wifi pick: the smallest cached 1080p that still has a few seeders, not already listed.
+function pickLite(parsed, exclude = []) {
+  const used = new Set(exclude.flatMap(p => [p.release, p.lookalike]).filter(Boolean));
+  const cands = dropUncachedTwins(merge(parsed)).filter(c =>
+    c.resolution === '1080p' &&
+    c.cached !== false &&
+    c.language !== 'foreign' &&
+    c.size >= LITE_MIN_BYTES &&
+    (c.seeders != null ? c.seeders >= LITE_MIN_SEEDERS : c.cached === true) &&
+    ![c.release, c.lookalike].some(k => k && used.has(k)));
+  if (!cands.length) return null;
+  const pick = cands.map(c => ({ ...c, score: score(c) }))
+    .sort((a, b) => a.size - b.size || b.score - a.score)[0];
+  return { ...pick, slot: 'lite' };
+}
+
+module.exports = { pickTop, pickLite, merge, score };

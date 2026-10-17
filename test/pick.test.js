@@ -119,3 +119,13 @@ test('reads size from 💾, not from a size in the release name', () => {
   const c = parseStream({ name: '[TB+] X\n1080p', title: 'Dune.Part.Two.2024.1080p.WEBRip.1600MB.DD5.1.x264-GalaxyRG\n👤 299 💾 1.6 GB' }, TB);
   assert.strictEqual(Math.round(c.size / 1024 ** 2), 1638);
 });
+
+test('lite pick: smallest cached 1080p with a few seeders, not already listed', () => {
+  const { pickLite } = require('../src/pick');
+  const one = (seeds, gb, hash, extra = '') => parseStream({ name: `[TB+] X\n1080p`, title: `Show.${hash.slice(0, 4)}.1080p.mkv\n👤 ${seeds} 💾 ${gb} GB ${extra}`, infoHash: hash }, TB);
+  const s = [one(900, 8, 'a'.repeat(40)), one(2, 0.9, 'b'.repeat(40)), one(40, 1.4, 'c'.repeat(40)), one(30, 0.1, 'd'.repeat(40)), one(50, 1.1, 'e'.repeat(40))];
+  const picks = pickTop(s);
+  const lite = pickLite(s, picks.filter(p => p.seeders === 50));
+  assert.strictEqual(lite.seeders, 40); // 0.9GB has too few seeders, 0.1GB is junk, 1.1GB is already listed
+  assert.strictEqual(lite.slot, 'lite');
+});
