@@ -147,4 +147,28 @@ function pickLite(parsed, exclude = []) {
   return { ...pick, slot: 'lite' };
 }
 
-module.exports = { pickTop, pickLite, merge, score };
+const BEST_MIN_SEEDERS = Number(process.env.BEST_MIN_SEEDERS || 3);
+const LANG_RANK = { en: 0, multi: 1, 'unknown-multi': 2 };
+
+function qualityBonus(c) {
+  const s = c.stream || {};
+  const text = [s.name, s.title, s.description, s.behaviorHints && s.behaviorHints.filename].filter(Boolean).join(' ');
+  return (/\bREMUX\b/i.test(text) ? 4 : 0) + (/\b(DV|DoVi|Dolby[ .]?Vision)\b/i.test(text) ? 2 : 0) + (/\bAtmos\b/i.test(text) ? 1 : 0);
+}
+
+// Best-quality 4K: the highest-bitrate cached 4K. Same title means same runtime, so the
+// biggest file has the highest bitrate. English first, then Remux/DV/Atmos, then size.
+function pickBest(parsed) {
+  const cands = dropUncachedTwins(merge(parsed)).filter(c =>
+    c.resolution === '4k' &&
+    c.cached !== false &&
+    c.language !== 'foreign' &&
+    c.size &&
+    (c.seeders != null ? c.seeders >= BEST_MIN_SEEDERS : c.cached === true));
+  if (!cands.length) return null;
+  const pick = cands.map(c => ({ ...c, score: score(c), quality: qualityBonus(c) }))
+    .sort((a, b) => (LANG_RANK[a.language] ?? 0) - (LANG_RANK[b.language] ?? 0) || b.quality - a.quality || b.size - a.size)[0];
+  return { ...pick, slot: 'best' };
+}
+
+module.exports = { pickTop, pickLite, pickBest, merge, score };

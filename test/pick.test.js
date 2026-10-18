@@ -136,3 +136,16 @@ test('lite pick skips AV1', () => {
   const lite = pickLite([one(0.6, 'a'.repeat(40), 'AV1'), one(1.2, 'b'.repeat(40), 'x264')]);
   assert.strictEqual(lite.size, Math.round(1.2 * 1024 ** 3));
 });
+
+test('best pick: biggest English cached 4K, Remux wins, junk and foreign skipped', () => {
+  const { pickBest } = require('../src/pick');
+  const one = (gb, hash, tags, seeds = 50, extra = '') => parseStream({ name: `[RD+] X\n2160p`, title: `Film.${hash.slice(0, 4)}.2160p.${tags}.mkv\n👤 ${seeds} 💾 ${gb} GB ${extra}`, infoHash: hash }, RD);
+  const s = [
+    one(70, 'a'.repeat(40), 'WEB-DL', 1),           // too few seeders
+    one(60, 'b'.repeat(40), 'REMUX.DV.Atmos'),
+    one(65, 'c'.repeat(40), 'WEB-DL'),               // bigger, but not a Remux
+    one(40, 'd'.repeat(40), 'WEB-DL'),
+  ];
+  assert.strictEqual(pickBest(s).size, Math.round(60 * 1024 ** 3));
+  assert.strictEqual(pickBest(s).slot, 'best');
+});
