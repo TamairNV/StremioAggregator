@@ -63,7 +63,7 @@ function decorate(p) {
   const text = [s.name, s.title, s.description, s.behaviorHints && s.behaviorHints.filename].filter(Boolean).join('\n');
   const label = p.slot === '4k' ? '4K' : p.slot === '1080p' ? '1080p' : p.slot === 'lite' ? '1080p Lite' : p.slot === 'best' ? '4K Best' : p.resolution;
   const lang = { multi: 'Multi', 'unknown-multi': 'Multi?', foreign: 'No ENG' }[p.language];
-  const stats = [...qualityTags(text), lang, fmtSize(p.size), p.seeders != null ? `👤 ${p.seeders}` : null].filter(Boolean).join(' · ');
+  const stats = [...qualityTags(text), lang, fmtSize(p.size), p.seeders != null ? `👤 ${p.seeders}` : p.cached ? '⚡ cached' : null].filter(Boolean).join(' · ');
   const { title, ...rest } = s;
   // Stremio's autoplay picks the next episode's stream with the same bingeGroup.
   // (Lite and Best each share one group, so autoplay keeps you on that kind of file all season.)
@@ -116,8 +116,12 @@ async function doLookup(type, id) {
   const lite = pickLite(mainParsed, best ? [best] : []);
   const specialKeys = [best, lite].filter(Boolean).flatMap(p => [p.release, p.lookalike]).filter(Boolean);
   const rest = mainParsed.filter(p => ![p.release, p.lookalike].some(k => k && specialKeys.includes(k)));
+  // If Best is already a Remux, keep the popular 4K slots for something different (when there's enough else).
+  const isRemux = p => /\bREMUX\b/i.test([p.stream.name, p.stream.title, p.stream.description, p.stream.behaviorHints && p.stream.behaviorHints.filename].filter(Boolean).join(' '));
+  const nonRemux4k = new Set(rest.filter(p => p.resolution === '4k' && !isRemux(p)).map(p => p.release || p.lookalike)).size;
+  const pool = best && isRemux(best) && nonRemux4k >= 2 ? rest.filter(p => !(p.resolution === '4k' && isRemux(p))) : rest;
   const want = 4;
-  const popular = pickTop(rest, { want4k: 2, want1080: 2, onlyCached, prefer: prefer && Date.now() - prefer.at < 6 * 3600e3 ? prefer.sigs : null });
+  const popular = pickTop(pool, { want4k: 2, want1080: 2, onlyCached, prefer: prefer && Date.now() - prefer.at < 6 * 3600e3 ? prefer.sigs : null });
   if (season && popular.length) seasonPicks.set(season, { at: Date.now(), sigs: new Set(popular.map(p => p.signature).filter(Boolean)) });
   const missing = want - popular.length;
   if (missing > 0) popular.push(...pickTop(toParsed(await backup), { want4k: 0, want1080: missing }));
