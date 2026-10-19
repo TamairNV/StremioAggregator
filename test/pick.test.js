@@ -142,10 +142,19 @@ test('best pick: biggest English cached 4K, Remux wins, junk and foreign skipped
   const one = (gb, hash, tags, seeds = 50, extra = '') => parseStream({ name: `[RD+] X\n2160p`, title: `Film.${hash.slice(0, 4)}.2160p.${tags}.mkv\n👤 ${seeds} 💾 ${gb} GB ${extra}`, infoHash: hash }, RD);
   const s = [
     one(70, 'a'.repeat(40), 'WEB-DL', 1),           // too few seeders
-    one(60, 'b'.repeat(40), 'REMUX.DV.Atmos'),
+    one(60, 'b'.repeat(40), 'REMUX.HDR.Atmos'),
     one(65, 'c'.repeat(40), 'WEB-DL'),               // bigger, but not a Remux
     one(40, 'd'.repeat(40), 'WEB-DL'),
   ];
   assert.strictEqual(pickBest(s).size, Math.round(60 * 1024 ** 3));
   assert.strictEqual(pickBest(s).slot, 'best');
+});
+
+test('drops disc Dolby Vision (Profile 7) but keeps WEB DV and plain Remux', () => {
+  const { isDiscDV } = require('../src/pick');
+  const t = title => isDiscDV(parseStream({ name: '[RD+] X\n2160p', title: title + '\n👤 50 💾 60 GB' }, RD));
+  assert.strictEqual(t('Dune.2021.2160p.UHD.BluRay.REMUX.DV.HDR.HEVC.TrueHD.Atmos-FGT.mkv'), true);
+  assert.strictEqual(t('Dune.2021.2160p.BluRay.x265.DoVi.HDR10-GRP.mkv'), true);
+  assert.strictEqual(t('Dune.2021.2160p.WEB-DL.DV.HDR.DDP5.1.Atmos-FLUX.mkv'), false);
+  assert.strictEqual(t('Dune.2021.2160p.UHD.BluRay.REMUX.HDR.HEVC.TrueHD.Atmos-FGT.mkv'), false);
 });
