@@ -3,7 +3,7 @@ const path = require('path');
 const { addonBuilder, serveHTTP } = require('stremio-addon-sdk');
 const { fetchOne } = require('./upstream');
 const { parseStream } = require('./parse');
-const { pickTop, pickLite, pickBest } = require('./pick');
+const { pickTop, pickLite, pickBest, dropDiscDV } = require('./pick');
 
 function loadProviders() {
   if (process.env.PROVIDERS) return JSON.parse(process.env.PROVIDERS);
@@ -109,7 +109,7 @@ async function doLookup(type, id) {
   const backup = Promise.all(providers.filter(p => p.backup).map(p => fetchOne(p, type, id)));
   const season = seasonKey(type, id);
   const prefer = season && seasonPicks.get(season);
-  const mainParsed = toParsed(await main);
+  const mainParsed = dropDiscDV(toParsed(await main));
   // The two special slots are chosen first so they really are the biggest / smallest;
   // the popular picks (2x 4K + 2x 1080p) come from what's left.
   const best = pickBest(mainParsed);

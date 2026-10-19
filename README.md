@@ -27,6 +27,7 @@ Uninstall (or keep below it) the 4 original addons if you only want to see the t
 | `PROVIDERS` | – | JSON array instead of `providers.json` |
 | `ONLY_CACHED` | false | drop streams marked uncached |
 | `LITE_MIN_SEEDERS` | 5 | minimum seeders for the Lite pick |
+| `ALLOW_DISC_DV` | off | set to `1` to stop dropping Blu-ray/Remux Dolby Vision (Profile 7, glitches on Apple TV) |
 | `BEST_MIN_SEEDERS` | 3 | minimum seeders for the 4K Best pick |
 | `UPSTREAM_TIMEOUT_MS` | 6000 | per-addon timeout |
 | `CACHE_MINUTES` | 30 | result cache |

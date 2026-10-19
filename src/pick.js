@@ -171,4 +171,22 @@ function pickBest(parsed) {
   return { ...pick, slot: 'best' };
 }
 
-module.exports = { pickTop, pickLite, pickBest, merge, score };
+// Dolby Vision from a disc source (UHD Blu-ray Remux or encode) is almost always Profile 7, the
+// dual-layer kind. Apple TV only decodes the base layer, and the FEL data it throws away shows up
+// as red/blue blocks in dark scenes. WEB DV (Profile 5/8) plays fine, so only disc DV is dropped.
+const ALLOW_DISC_DV = process.env.ALLOW_DISC_DV === '1';
+const DV = /\b(DV|DoVi|Dolby[ .]?Vision)\b/i;
+const DISC = /\b(REMUX|Blu-?Ray|BDRip|BDRemux|BD|UHD[ .]?BD)\b/i;
+const WEB = /\bWEB(-?DL|-?Rip)?\b/i;
+
+function isDiscDV(c) {
+  const s = c.stream || {};
+  const text = [s.name, s.title, s.description, s.behaviorHints && s.behaviorHints.filename].filter(Boolean).join(' ');
+  return DV.test(text) && DISC.test(text) && !WEB.test(text);
+}
+
+function dropDiscDV(parsed) {
+  return ALLOW_DISC_DV ? parsed : parsed.filter(c => !isDiscDV(c));
+}
+
+module.exports = { pickTop, pickLite, pickBest, merge, score, isDiscDV, dropDiscDV };
