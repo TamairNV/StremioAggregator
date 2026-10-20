@@ -1,10 +1,11 @@
 #!/bin/sh
-# Run on the server: pull main, rebuild and recreate the container, roll back if it doesn't answer.
-# The code is baked into the image, so a plain `docker restart` would keep running the old code.
+# Run on the server: pull main and restart the addon. src/ is mounted into the container, so a code
+# change only needs a restart; the image is rebuilt only when package.json or the Dockerfile changed.
 set -eu
 cd "$(dirname "$0")"
 NAME=stremio-aggregator
 
+OLD=$(git rev-parse HEAD)
 git pull -q --ff-only origin main
 SHA=$(git rev-parse --short HEAD)
 
@@ -14,6 +15,7 @@ run() {
   docker run -d --name "$NAME" --restart unless-stopped -p 7000:7000 \
     -e UPSTREAM_TIMEOUT_MS=4000 \
     -v "$PWD/providers.json:/app/providers.json:ro" \
+    -v "$PWD/src:/app/src:ro" \
     "$1" >/dev/null
 }
 healthy() {
@@ -24,15 +26,17 @@ healthy() {
   return 1
 }
 
-docker image inspect "$NAME:latest" >/dev/null 2>&1 && docker tag "$NAME:latest" "$NAME:previous"
-docker build -q --label revision="$SHA" -t "$NAME:latest" . >/dev/null
-run "$NAME:latest"
+if [ -n "$(git diff --name-only "$OLD" HEAD -- package.json package-lock.json Dockerfile)" ] || [ "${1:-}" = --rebuild ]; then
+  docker build -q -t "$NAME:latest" . >/dev/null
+  run "$NAME:latest"
+else
+  docker restart "$NAME" >/dev/null
+fi
 
 if healthy; then
   echo "Live: $SHA ($(git log -1 --format=%s))"
 else
-  echo "New container didn't answer, rolling back" >&2
+  echo "Addon isn't answering after updating to $SHA. Roll back with: git checkout $OLD && docker restart $NAME" >&2
   docker logs --tail 20 "$NAME" >&2 || true
-  docker image inspect "$NAME:previous" >/dev/null 2>&1 && run "$NAME:previous" && docker tag "$NAME:previous" "$NAME:latest"
   exit 1
 fi

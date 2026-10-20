@@ -45,6 +45,7 @@ docker build -t stremio-aggregator .
 docker run -d --name stremio-aggregator --restart unless-stopped -p 7000:7000 \
   -e UPSTREAM_TIMEOUT_MS=4000 \
   -v "$PWD/providers.json:/app/providers.json:ro" \
+  -v "$PWD/src:/app/src:ro" \
   stremio-aggregator
 ```
 `providers.json` stays outside the image (it holds your keys). After editing it: `docker restart stremio-aggregator`.
@@ -53,9 +54,10 @@ To update the code, merge to main, then from your own machine:
 ./deploy.sh          # server pulls main, rebuilds, recreates the container
 ./deploy.sh status   # which commit is live
 ```
-On the server itself that's just `./update.sh`. It rebuilds rather than restarts because the code is baked into the
-image, and rolls back to the previous image if the new one doesn't answer within 15s. The server pulls over SSH with a
-read-only deploy key (`~/.ssh/stremio_deploy`, host alias `github-stremio` in `~/.ssh/config`).
+On the server itself that's just `./update.sh`. `src/` is mounted read-only into the container, so a code change is a
+pull plus `docker restart`; the image is only rebuilt when `package.json` or the `Dockerfile` changed (or with
+`./update.sh --rebuild`). The server pulls over SSH with a read-only deploy key (`~/.ssh/stremio_deploy`, host alias
+`github-stremio` in `~/.ssh/config`).
 
 HTTPS, reachable only from your own Tailscale devices:
 ```bash
