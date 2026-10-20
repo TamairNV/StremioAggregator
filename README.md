@@ -48,14 +48,14 @@ docker run -d --name stremio-aggregator --restart unless-stopped -p 7000:7000 \
   stremio-aggregator
 ```
 `providers.json` stays outside the image (it holds your keys). After editing it: `docker restart stremio-aggregator`.
-To update the code, run this on your own machine from this repo:
+To update the code, merge to main, then from your own machine:
 ```bash
-./deploy.sh          # deploy origin/main (or ./deploy.sh <branch|commit>)
+./deploy.sh          # server pulls main, rebuilds, recreates the container
 ./deploy.sh status   # which commit is live
 ```
-It runs the tests, copies the code to the server over SSH (the server doesn't need GitHub access), rebuilds,
-recreates the container with the options in `deploy-remote.sh` and rolls back if the new one doesn't answer.
-Set `DEPLOY_HOST` / `DEPLOY_DIR` to point it somewhere other than `tnv@192.168.1.199:~/StremioAggregator`.
+On the server itself that's just `./update.sh`. It rebuilds rather than restarts because the code is baked into the
+image, and rolls back to the previous image if the new one doesn't answer within 15s. The server pulls over SSH with a
+read-only deploy key (`~/.ssh/stremio_deploy`, host alias `github-stremio` in `~/.ssh/config`).
 
 HTTPS, reachable only from your own Tailscale devices:
 ```bash

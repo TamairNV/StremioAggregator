@@ -1,14 +1,19 @@
 #!/bin/sh
-# Server half of deploy.sh. Expects the new code unpacked in ~/$DIR/.incoming.
+# Run on the server: pull main, rebuild and recreate the container, roll back if it doesn't answer.
+# The code is baked into the image, so a plain `docker restart` would keep running the old code.
 set -eu
-cd ~/"$DIR"
+cd "$(dirname "$0")"
+NAME=stremio-aggregator
+
+git pull -q --ff-only origin main
+SHA=$(git rev-parse --short HEAD)
 
 # Same run options every time, kept here so they can't drift.
 run() {
   docker rm -f "$NAME" >/dev/null 2>&1 || true
   docker run -d --name "$NAME" --restart unless-stopped -p 7000:7000 \
     -e UPSTREAM_TIMEOUT_MS=4000 \
-    -v "$HOME/$DIR/providers.json:/app/providers.json:ro" \
+    -v "$PWD/providers.json:/app/providers.json:ro" \
     "$1" >/dev/null
 }
 healthy() {
@@ -20,18 +25,14 @@ healthy() {
 }
 
 docker image inspect "$NAME:latest" >/dev/null 2>&1 && docker tag "$NAME:latest" "$NAME:previous"
-docker build -q --label revision="$SHA" -t "$NAME:$SHA" -t "$NAME:latest" .incoming >/dev/null
+docker build -q --label revision="$SHA" -t "$NAME:latest" . >/dev/null
 run "$NAME:latest"
 
 if healthy; then
-  rm -rf src.prev && { [ -d src ] && mv src src.prev || true; }
-  mv .incoming/src src && cp .incoming/package.json .incoming/Dockerfile .incoming/.dockerignore .incoming/deploy-remote.sh .
-  rm -rf .incoming
-  echo "Live: $SHA"
+  echo "Live: $SHA ($(git log -1 --format=%s))"
 else
   echo "New container didn't answer, rolling back" >&2
   docker logs --tail 20 "$NAME" >&2 || true
   docker image inspect "$NAME:previous" >/dev/null 2>&1 && run "$NAME:previous" && docker tag "$NAME:previous" "$NAME:latest"
-  rm -rf .incoming
   exit 1
 fi
